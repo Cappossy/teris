@@ -381,6 +381,7 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
             else:
                 empty_row = False
                 board[20 - row - 1][col] = 1
+        time.sleep(0.015)
         if empty_row:
             break
     return board
@@ -473,6 +474,19 @@ while True:
             start_time2 = time.time()
             best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
             print("time for find_best_position: ", time.time() - start_time2)
+
+            # --- protection : si aucune position trouvée ---
+            if best_position is None or best_rotation is None:
+                print("Aucune position valide trouvée → sécurité anti-spam activée")
+                time.sleep(0.05)
+                continue
+
+            # --- protection : si le board devient trop haut ---
+            max_height = max((i for i, row in enumerate(tetrisboard.board) if any(row)), default=0)
+            if max_height > 17:
+                print("PANIC MODE ACTIVÉ — jeu simplifié")
+                # profondeur 1 = beaucoup plus stable
+                best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), 1)
             best_piece_pos_rot = piece_array[0][best_rotation]
             # remove first piece from piece_array
             piece_array.pop(0)
@@ -497,7 +511,7 @@ while True:
             time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
             elapsed = time.time() - start_time
-            min_loop = 0.05  # 80ms minimum par boucle
+            min_loop = 0.08  # 50ms minimum par boucle
             if elapsed < min_loop:
                 time.sleep(min_loop - elapsed)
 def closest_color_in_area(colors, x, y):
