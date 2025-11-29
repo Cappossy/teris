@@ -326,7 +326,7 @@ def key_press(best_position, best_rotation, current_x=3):
     import random
 
     def human_delay():
-        time.sleep(random.uniform(0.01, 0.03)) # petite pause réaliste
+        time.sleep(random.uniform(0.015, 0.05))  # 15 à 50 ms entre actions
 
     # Rotation
     if best_rotation == 1:
@@ -340,19 +340,17 @@ def key_press(best_position, best_rotation, current_x=3):
         human_delay()
 
     # Déplacement horizontal
-    target_x = best_position[1]
-    while current_x < target_x:
-        keyboard.press_and_release(move_right_key)
-        current_x += 1
-        human_delay()
-    while current_x > target_x:
-        keyboard.press_and_release(move_left_key)
-        current_x -= 1
+    for _ in range(abs(best_position[1] - current_x)):
+        if best_position[1] < current_x:
+            keyboard.press_and_release(move_left_key)
+        else:
+            keyboard.press_and_release(move_right_key)
         human_delay()
 
     # Hard drop
     keyboard.press_and_release(drop_key)
     human_delay()
+
 
 
 
