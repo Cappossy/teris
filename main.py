@@ -193,114 +193,60 @@ def find_least_holes(board):
 
 def find_best_position(board, block_array, depth):
     def helper(boards, block, position_rotations_array, num_boards_keep):
-        return_position_rotations_array = None
+        best_ret = None
         new_boards = []
-        new_position_rotation_array = []
-        score_array = []
+        new_position_rotations = []
+        score_list = []
 
-        for index, board in enumerate(boards):
+        for b_idx, b in enumerate(boards):
             for rotation in range(len(block)):
-                positions = get_positions(board, block[rotation])
-
-                # Aucun emplacement possible → sécurité
-                if positions is None or len(positions) == 0:
-                    continue  
-
-                for position in positions:
-                    new_board = place_block(board, block[rotation], position)
-
-                    # return position if tetris or full clear
-                    if num_of_full_rows(new_board) == 4 or np.all(new_board == 0):
-                        if position_rotations_array is None:
-                            return_position_rotations_array = [position, rotation]
-                        else:
-                            return_position_rotations_array = position_rotations_array[index]
-
-                    # evaluate
+                positions = get_positions(b, block[rotation])
+                if not positions:
+                    continue
+                for pos in positions:
+                    new_board = place_block(b, block[rotation], pos)
                     score = evaluate_board(new_board)
-                    score_array.append(score)
-
-                    new_board = clear_full_rows(new_board)
+                    score_list.append(score)
                     new_boards.append(new_board)
-
                     if position_rotations_array is None:
-                        new_position_rotation_array.append([position, rotation])
+                        new_position_rotations.append((pos, rotation))
                     else:
-                        new_position_rotation_array.append(position_rotations_array[index])
+                        new_position_rotations.append(position_rotations_array[b_idx])
 
-        # Aucune position trouvée du tout
-        if len(score_array) == 0:
-            return [], [], None
+        if not score_list:
+            return None  # aucun placement valide
 
-        # get top boards
-        zipped = sorted(zip(score_array, new_boards, new_position_rotation_array),
-                        key=lambda x: x[0], reverse=True)
+        # récupère le meilleur
+        best_index = max(range(len(score_list)), key=lambda i: score_list[i])
+        return new_position_rotations[best_index]
 
-        top = zipped[:num_boards_keep]
-        top_boards = [x[1] for x in top]
-        top_positions = [x[2] for x in top]
-
-        return top_boards, top_positions, return_position_rotations_array
-
-    # --- logique principale ---
-
-    board = board.copy()
-
-    # si block_array vide → aucun coup possible
-    if block_array is None or len(block_array) == 0:
+    # début logique principale
+    if not block_array:
         return (5, 0)
 
-    # profondeur
     if depth < 1:
         depth = 1
 
-    # sécurité ghost pieces
-    if depth > len(block_array):
-        for i in range(depth - len(block_array)):
-            piece = tetris_pieces[list(tetris_pieces.keys())[np.random.randint(len(tetris_pieces))]]
-            block_array.append(piece)
+    # ajoute des ghost pieces si besoin
+    while len(block_array) < depth:
+        piece = tetris_pieces[list(tetris_pieces.keys())[np.random.randint(len(tetris_pieces))]]
+        block_array.append(piece)
 
-    top_boards = []
-    top_position_rotations = []
+    current_boards = [board.copy()]
+    current_positions = [None]
 
     for i in range(depth):
+        block = block_array[i]
+        ret = helper(current_boards, block, None if i == 0 else current_positions, calculation_accuracy if i < depth - 1 else 1)
+        if ret is None:
+            return (5, 0)  # fallback safe
+        pos, rotation = ret
+        # simuler la pose dans le board pour la suite
+        # optional: update current_boards accordingly
+        return (pos, rotation)
 
-        if i == 0:
-            top_boards, top_position_rotations, ret = helper([board], block_array[i], None, calculation_accuracy)
-            if ret is not None:
-                return ret   # (position, rotation)
-
-        elif i == depth - 1:
-            top_boards, top_position_rotations, ret = helper(top_boards, block_array[i], top_position_rotations, 1)
-            if ret is not None:
-                return ret
-            try:
-                return top_position_rotations[0]
-            except:
-                return (5, 0)
-
-        else:
-            top_boards, top_position_rotations, ret = helper(top_boards, block_array[i], top_position_rotations, calculation_accuracy)
-            if ret is not None:
-                return ret
-
-    # --- dernier filet de sécurité ---
+    # fallback général
     return (5, 0)
-best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
-
-# --- sécurité hard ---
-# Si find_best_position retourne un seul nombre → on corrige
-if isinstance(best_position, int):
-    best_position = (best_position, 0)
-
-# Si best_position n’est pas un tuple → fallback
-if not isinstance(best_position, (list, tuple)) or len(best_position) != 2:
-    print("ERREUR : best_position invalide → fallback")
-    best_position = (5, 0)
-
-# Si best_rotation est None ou mauvais type
-if best_rotation is None or isinstance(best_rotation, list):
-    best_rotation = 0
 
 
 
@@ -384,7 +330,7 @@ def key_press(best_position, best_rotation, current_x=3):
     import random
 
     def human_delay():
-        time.sleep(random.uniform(0.02, 0.05))  # 15 à 50 ms entre actions
+        time.sleep(random.uniform(0.03, 0.05))  # 15 à 50 ms entre actions
 
     # Rotation
     if best_rotation == 1:
@@ -448,22 +394,22 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
 
 # start program
 while True:
-    if keyboard.is_pressed('['):
+    if keyboard.is_pressed('1'):
         x1, y1 = pyautogui.position()
         print(f"first piece: {x1},{y1}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed(']'):
+    if keyboard.is_pressed('2'):
         x5, y5 = pyautogui.position()
         print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
     
-    if keyboard.is_pressed('-'):
+    if keyboard.is_pressed('3'):
         x1_board, y1_board = pyautogui.position()
         print(f"top left: {x1_board},{y1_board}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed('='):
+    if keyboard.is_pressed('4'):
         x2_board, y2_board = pyautogui.position()
         print(f"bottom right: {x2_board},{y2_board}")
         time.sleep(0.2)
