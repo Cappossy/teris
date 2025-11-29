@@ -447,10 +447,12 @@ while True:
             # set break key
             if keyboard.is_pressed('esc'):
                 break
+
             # restart
             if keyboard.is_pressed(';'):
                 board_initialized = False
                 break
+
             # lock until piece changes
             if first_move:
                 closest_color1_0 = closest_color_in_area(colors, x1, y1)
@@ -459,71 +461,81 @@ while True:
                     first_move = False
                 else:
                     continue
+
             # total time
             start_time = time.time()
+
             # time to get color
             start_time3 = time.time()
             closest_color5 = closest_color_in_area(colors, x5, y5)
             piece_array.append(get_piece_based_on_color(closest_color5, colors))
-            print("time for get color: ", time.time() - start_time)
+            print("time for get color: ", time.time() - start_time3)
+
             if scan_board:
                 # time to get board
                 start_time2 = time.time()
-                # get board from screen
                 tetrisboard.board = get_tetris_board_from_screen(x1_board, y1_board, x2_board, y2_board)
                 for row in reversed(tetrisboard.board):
                     print(row)
                 print("time for get board: ", time.time() - start_time2)
-            # time how long find_best_position takes
+
+            # compute best move
             start_time2 = time.time()
             best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
             print("time for find_best_position: ", time.time() - start_time2)
 
-            # --- protection : si aucune position trouvée ---
+            # --- protection : aucune position trouvée ---
             if best_position is None or best_rotation is None:
                 print("Aucune position valide trouvée → sécurité anti-spam activée")
                 time.sleep(0.05)
                 continue
 
-            # --- protection : si le board devient trop haut ---
+            # --- protection : board trop haut ---
             max_height = max((i for i, row in enumerate(tetrisboard.board) if any(row)), default=0)
             if max_height > 18:
                 print("⚠️ Board trop haut → ralentissement pour éviter erreur")
                 time.sleep(0.05)
                 continue
-                # profondeur 1 = beaucoup plus stable
-                best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), 1)
+
+            # best piece rotation matrix
             best_piece_pos_rot = piece_array[0][best_rotation]
-            # remove first piece from piece_array
+
+            # remove first piece
             piece_array.pop(0)
-            # add offset depending on padded zeros on the left side of axis 1 only
-            # ajouter offset seulement si best_piece_pos_rot est correct
+
+            # ----- OFFSET FIX -----
             if isinstance(best_piece_pos_rot, np.ndarray):
-               offset = 0
-               for i in range(best_piece_pos_rot.shape[1]):
-                   if not any(best_piece_pos_rot[:, i]):
-                       offset += 1
-                   else:
-                       break
+                offset = 0
+                for i in range(best_piece_pos_rot.shape[1]):
+                    if not any(best_piece_pos_rot[:, i]):
+                        offset += 1
+                    else:
+                        break
                 best_position2 = (best_position[0], best_position[1] - offset)
             else:
-                best_position2 = best_position  # fallback simple
-            # key presses time
+                best_position2 = best_position  # fallback
+
+            # key presses
             start_time4 = time.time()
             key_press(best_position2, best_rotation)
             print("time for key presses: ", time.time() - start_time4)
-            # remove 0s padding
+
+            # clean padding
             best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
             best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
+
             tetrisboard.add_piece(best_piece_pos_rot, best_position)
-            # clear full rows
             tetrisboard.clear_full_rows()
-            time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
+
+            time.sleep(wait_time)
             print("total time: ", time.time() - start_time)
+
+            # minimum loop time
             elapsed = time.time() - start_time
-            min_loop = 0.08  # 50ms minimum par boucle
+            min_loop = 0.08
             if elapsed < min_loop:
                 time.sleep(min_loop - elapsed)
+
 def closest_color_in_area(colors, x, y):
     min_diff = float('inf')
     closest_color = (0, 0, 0)
