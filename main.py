@@ -326,7 +326,7 @@ def key_press(best_position, best_rotation, current_x=3):
     import random
 
     def human_delay():
-        time.sleep(random.uniform(0.015, 0.05))  # 15 à 50 ms entre actions
+        time.sleep(random.uniform(0.02, 0.05))  # 15 à 50 ms entre actions
 
     # Rotation
     if best_rotation == 1:
@@ -497,6 +497,28 @@ while True:
             time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
             elapsed = time.time() - start_time
-            min_loop = 0.08  # 80ms minimum par boucle
+            min_loop = 0.05  # 80ms minimum par boucle
             if elapsed < min_loop:
                 time.sleep(min_loop - elapsed)
+def closest_color_in_area(colors, x, y):
+    min_diff = float('inf')
+    closest_color = (0, 0, 0)
+    while min_diff > 20:
+        if keyboard.is_pressed('esc'):
+            break
+        # utiliser une zone moyenne de pixels autour de (x, y)
+        half = pixel_area // 2
+        image = ImageGrab.grab(bbox=(x - half, y - half, x + half, y + half))
+        pixels = np.array(image)
+        avg_color = tuple(np.mean(pixels.reshape(-1, 3), axis=0).astype(int))
+
+        # comparer avec les couleurs connues
+        for color in colors:
+            diff = euclidean_distance(color, avg_color)
+            if diff < min_diff:
+                min_diff = diff
+                closest_color = color
+        if min_diff < 20:
+            break
+    return closest_color
+
