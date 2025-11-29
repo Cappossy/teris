@@ -322,50 +322,30 @@ tetrisboard = TetrisBoard()
 board_initialized = False
 piece_array = []
 
-def key_press(best_position, best_rotation):
-    import random
-
-    def human_delay():
-        time.sleep(random.uniform(0.02, 0.05))
-
+def key_press(best_position, best_rotation, current_x):
     # rotation
     if best_rotation == 1:
         keyboard.press_and_release(rotate_clockwise_key)
-        human_delay()
     elif best_rotation == 2:
         keyboard.press_and_release(rotate_180_key)
-        human_delay()
     elif best_rotation == 3:
         keyboard.press_and_release(rotate_counterclockwise_key)
-        human_delay()
 
     # déplacement horizontal
-    current_x = 3
-    target_x = best_position[1]
-
-    # décalage rapide mais fluide
-    while current_x != target_x:
-        if target_x < current_x:
+    delta = best_position[1] - current_x
+    if delta < 0:
+        for _ in range(-delta):
             keyboard.press_and_release(move_left_key)
-            current_x -= 1
-        else:
+    elif delta > 0:
+        for _ in range(delta):
             keyboard.press_and_release(move_right_key)
-            current_x += 1
-        human_delay()
 
-    # mini-hésitation
-    time.sleep(random.uniform(0.03, 0.06))
-
-    # drop
+    # hard drop
     keyboard.press_and_release(drop_key)
-    human_delay()
-
-
-
-
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
     board_coords = (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
+    time.sleep(0.01)
     board_image = ImageGrab.grab(board_coords)
     board_image = board_image.convert('L')
     board = np.zeros((20, 10), dtype=int)
@@ -448,6 +428,7 @@ while True:
         print(f'Closest color: {closest_color4}')
         print(f'Closest color: {closest_color5}')
         first_move = True
+        
         while True:
             # set break key
             if keyboard.is_pressed('esc'):
@@ -506,3 +487,9 @@ while True:
             tetrisboard.clear_full_rows()
             time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
+            
+            # limiter la vitesse de la boucle pour ne pas trop flooder
+            elapsed = time.time() - start_time
+            min_loop = 0.08  # 80ms par loop
+            if elapsed < min_loop:
+                time.sleep(min_loop - elapsed)
