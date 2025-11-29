@@ -487,21 +487,27 @@ while True:
 
             # --- protection : si le board devient trop haut ---
             max_height = max((i for i, row in enumerate(tetrisboard.board) if any(row)), default=0)
-            if max_height > 17:
-                print("PANIC MODE ACTIVÉ — jeu simplifié")
+            if max_height > 18:
+                print("⚠️ Board trop haut → ralentissement pour éviter erreur")
+                time.sleep(0.05)
+                continue
                 # profondeur 1 = beaucoup plus stable
                 best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), 1)
             best_piece_pos_rot = piece_array[0][best_rotation]
             # remove first piece from piece_array
             piece_array.pop(0)
             # add offset depending on padded zeros on the left side of axis 1 only
-            offset = 0
-            for i in range(best_piece_pos_rot.shape[1]):
-                if not any(best_piece_pos_rot[:, i]):
-                    offset += 1
-                else:
-                    break
-            best_position2 = (best_position[0], best_position[1] - offset)
+            # ajouter offset seulement si best_piece_pos_rot est correct
+            if isinstance(best_piece_pos_rot, np.ndarray):
+               offset = 0
+               for i in range(best_piece_pos_rot.shape[1]):
+                   if not any(best_piece_pos_rot[:, i]):
+                       offset += 1
+                   else:
+                       break
+                best_position2 = (best_position[0], best_position[1] - offset)
+            else:
+                best_position2 = best_position  # fallback simple
             # key presses time
             start_time4 = time.time()
             key_press(best_position2, best_rotation)
