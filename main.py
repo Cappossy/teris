@@ -197,11 +197,18 @@ def find_best_position(board, block_array, depth):
         new_boards = []
         new_position_rotation_array = []
         score_array = []
+
         for index, board in enumerate(boards):
             for rotation in range(len(block)):
                 positions = get_positions(board, block[rotation])
+
+                # Aucun emplacement possible → sécurité
+                if positions is None or len(positions) == 0:
+                    continue  
+
                 for position in positions:
                     new_board = place_block(board, block[rotation], position)
+
                     # return position if tetris or full clear
                     if num_of_full_rows(new_board) == 4 or np.all(new_board == 0):
                         if position_rotations_array is None:
@@ -209,42 +216,93 @@ def find_best_position(board, block_array, depth):
                         else:
                             return_position_rotations_array = position_rotations_array[index]
 
-                    # evaluate board score and add to list
+                    # evaluate
                     score = evaluate_board(new_board)
                     score_array.append(score)
-                    new_board = clear_full_rows(new_board) # clear after evaluation
+
+                    new_board = clear_full_rows(new_board)
                     new_boards.append(new_board)
+
                     if position_rotations_array is None:
                         new_position_rotation_array.append([position, rotation])
                     else:
                         new_position_rotation_array.append(position_rotations_array[index])
-        # get top calculation_accuracy boards and position rotations using their scores
-        top_boards = [x for _, x in sorted(zip(score_array, new_boards), key=lambda pair: pair[0], reverse=True)][:num_boards_keep]
-        top_position_rotations = [x for _, x in sorted(zip(score_array, new_position_rotation_array), key=lambda pair: pair[0], reverse=True)][:num_boards_keep]
-        
-        return top_boards, top_position_rotations, return_position_rotations_array
+
+        # Aucune position trouvée du tout
+        if len(score_array) == 0:
+            return [], [], None
+
+        # get top boards
+        zipped = sorted(zip(score_array, new_boards, new_position_rotation_array),
+                        key=lambda x: x[0], reverse=True)
+
+        top = zipped[:num_boards_keep]
+        top_boards = [x[1] for x in top]
+        top_positions = [x[2] for x in top]
+
+        return top_boards, top_positions, return_position_rotations_array
+
+    # --- logique principale ---
+
     board = board.copy()
-    top_boards = []
-    top_position_rotations = []
-    # add random ghost pieces from tetris_pieces to block_array
+
+    # si block_array vide → aucun coup possible
+    if block_array is None or len(block_array) == 0:
+        return (5, 0)
+
+    # profondeur
+    if depth < 1:
+        depth = 1
+
+    # sécurité ghost pieces
     if depth > len(block_array):
         for i in range(depth - len(block_array)):
             piece = tetris_pieces[list(tetris_pieces.keys())[np.random.randint(len(tetris_pieces))]]
             block_array.append(piece)
+
+    top_boards = []
+    top_position_rotations = []
+
     for i in range(depth):
+
         if i == 0:
-            top_boards, top_position_rotations, return_position_rotations_array = helper([board], block_array[i], None, calculation_accuracy)
-            if return_position_rotations_array is not None:
-                return return_position_rotations_array
+            top_boards, top_position_rotations, ret = helper([board], block_array[i], None, calculation_accuracy)
+            if ret is not None:
+                return ret   # (position, rotation)
+
         elif i == depth - 1:
-            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i], top_position_rotations, 1)
-            if return_position_rotations_array is not None:
-                return return_position_rotations_array
-            return top_position_rotations[0]
+            top_boards, top_position_rotations, ret = helper(top_boards, block_array[i], top_position_rotations, 1)
+            if ret is not None:
+                return ret
+            try:
+                return top_position_rotations[0]
+            except:
+                return (5, 0)
+
         else:
-            top_boards, top_position_rotations, return_position_rotations_array = helper(top_boards, block_array[i], top_position_rotations, calculation_accuracy)
-            if return_position_rotations_array is not None:
-                return return_position_rotations_array
+            top_boards, top_position_rotations, ret = helper(top_boards, block_array[i], top_position_rotations, calculation_accuracy)
+            if ret is not None:
+                return ret
+
+    # --- dernier filet de sécurité ---
+    return (5, 0)
+best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
+
+# --- sécurité hard ---
+# Si find_best_position retourne un seul nombre → on corrige
+if isinstance(best_position, int):
+    best_position = (best_position, 0)
+
+# Si best_position n’est pas un tuple → fallback
+if not isinstance(best_position, (list, tuple)) or len(best_position) != 2:
+    print("ERREUR : best_position invalide → fallback")
+    best_position = (5, 0)
+
+# Si best_rotation est None ou mauvais type
+if best_rotation is None or isinstance(best_rotation, list):
+    best_rotation = 0
+
+
 
 
 def place_block(board, rotated_block, position):
