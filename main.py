@@ -8,11 +8,11 @@ import pyautogui # somehow the mouse get_position doesn't work
 
 x1_board, y1_board = 823, 251 # top left of board
 x2_board, y2_board = 1145, 889 # bottom right of board
-x1, y1 = 1250, 326  # first piece
+x1, y1 = 1250, 326
 x2, y2 = 0, 0
 x3, y3 = 0, 0
 x4, y4 = 0, 0
-x5, y5 = 1243, 736  # fifth piece
+x5, y5 = 1243, 736
 
 
 pixel_area = 30 # number of pixels to check for color - auto
@@ -25,7 +25,7 @@ move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 8 # number of best moves to keep at each depth - higher number means more accurate but slower
+calculation_accuracy = 5 # number of best moves to keep at each depth - higher number means more accurate but slower
 max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
 wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
 scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
@@ -322,43 +322,46 @@ tetrisboard = TetrisBoard()
 board_initialized = False
 piece_array = []
 
-def key_press(best_position, best_rotation, current_x=3):
-    import random
-
-    def human_delay():
-        time.sleep(random.uniform(0.01, 0.03))  # avant d’ajouter la pièce détectée
-
-
-    # Rotation
+def key_press(best_position, best_rotation):
+    # rotate
+    print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
-        keyboard.press_and_release(rotate_clockwise_key)
-        human_delay()
+        keyboard.press(rotate_clockwise_key)
+        keyboard.release(rotate_clockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 2:
-        keyboard.press_and_release(rotate_180_key)
-        human_delay()
+        keyboard.press(rotate_180_key)
+        keyboard.release(rotate_180_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 3:
-        keyboard.press_and_release(rotate_counterclockwise_key)
-        human_delay()
-
-    # Déplacement horizontal
-    target_x = best_position[1]
-    while current_x < target_x:
-        keyboard.press_and_release(move_right_key)
-        current_x += 1
-        human_delay()
-    while current_x > target_x:
-        keyboard.press_and_release(move_left_key)
-        current_x -= 1
-        human_delay()
-
-    # Hard drop
-    keyboard.press_and_release(drop_key)
-    human_delay()
+        keyboard.press(rotate_counterclockwise_key)
+        keyboard.release(rotate_counterclockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
+    # press left arrow or right arrow to move to position
+    if best_position[1] < 3:
+        for i in range(3 - best_position[1]):
+            keyboard.press(move_left_key)
+            keyboard.release(move_left_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
+    elif best_position[1] > 3:
+        for i in range(best_position[1] - 3):
+            keyboard.press(move_right_key)
+            keyboard.release(move_right_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
+    # press space to drop piece
+    keyboard.press('space')
+    keyboard.release('space')
+    if key_delay > 0:
+        time.sleep(key_delay)
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
     board_coords = (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
-    time.sleep(0.01)
     board_image = ImageGrab.grab(board_coords)
     board_image = board_image.convert('L')
     board = np.zeros((20, 10), dtype=int)
@@ -441,7 +444,6 @@ while True:
         print(f'Closest color: {closest_color4}')
         print(f'Closest color: {closest_color5}')
         first_move = True
-        
         while True:
             # set break key
             if keyboard.is_pressed('esc'):
@@ -500,10 +502,3 @@ while True:
             tetrisboard.clear_full_rows()
             time.sleep(wait_time) # this is needed for some reason (maybe wait for screen to refresh), probably can find a better way
             print("total time: ", time.time() - start_time)
-            
-            # limiter la vitesse de la boucle pour ne pas trop flooder
-            elapsed = time.time() - start_time
-            min_loop = 0.08  # 80ms minimum par boucle
-            if elapsed < min_loop:
-                time.sleep(min_loop - elapsed)
-
