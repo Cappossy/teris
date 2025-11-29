@@ -114,25 +114,39 @@ tetris_pieces = {
 
 
 def evaluate_board(board):
-    heights = []
+    # Implement your heuristic function here
+    # The height of the tallest column - find highest row with a 1
+    highest_block_row = 20
+    for row in range(board.shape[0]):
+        if not np.any(board[row] == 1):
+            highest_block_row = row
+            break
+    # The sum of max height block in each column - the bottom of the board is index 0
+    sum_of_heights = 0
     for col in range(board.shape[1]):
-        col_h = 0
         for row in reversed(range(board.shape[0])):
             if board[row][col] == 1:
-                col_h = row + 1
+                sum_of_heights += row + 1
                 break
-        heights.append(col_h)
-    agg_height = sum(heights)
-    holes = 0
+    num_cleared_rows = np.sum(np.all(board == 1, axis=1))
+    # The number of holes - find number of 0s with 1s above
+    holes = np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
+    # The number of blockades - find number of 1s with 0s above
+    blockades = np.sum((board == 1) & (np.cumsum(board, axis=0) > 0))
+    # assign higher weights to higher blocks
+    weighted_heights = 0
     for col in range(board.shape[1]):
-        col_bool = board[:, col]
-        first_block = np.argmax(col_bool[::-1] == 1) if np.any(col_bool) else 0
-        # holes = number of empty under first_block
-        holes += np.sum(col_bool[: col_bool.shape[0] - first_block - 1] == 0)
-    bumpiness = sum(abs(heights[i] - heights[i+1]) for i in range(len(heights)-1))
-    complete_lines = np.sum(np.all(board == 1, axis=1))
-    # Heuristic weights (à ajuster si besoin)
-    score = -0.5 * agg_height + 0.76 * complete_lines - 0.36 * holes - 0.18 * bumpiness
+        for row in reversed(range(board.shape[0])):
+            # find highest block in each column
+            if board[row][col] == 1:
+                if row > 5:
+                    weighted_heights += (row + 1) * (row + 1 - 5)
+                else:
+                    weighted_heights += (row + 1)
+                break
+
+    A, B, C, D, E = -1, 10, -50, -1, -1
+    score = A * weighted_heights + B * num_cleared_rows * num_cleared_rows * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
     return score
 
 def get_positions(board, rotated_block):
@@ -308,7 +322,7 @@ tetrisboard = TetrisBoard()
 board_initialized = False
 piece_array = []
 
-def key_press(best_position, best_rotation, current_x=3):
+def key_press(best_position, best_rotation, current_x):
     # rotation
     if best_rotation == 1:
         keyboard.press_and_release(rotate_clockwise_key)
@@ -316,18 +330,19 @@ def key_press(best_position, best_rotation, current_x=3):
         keyboard.press_and_release(rotate_180_key)
     elif best_rotation == 3:
         keyboard.press_and_release(rotate_counterclockwise_key)
-    # horizontal move
-    target_x = best_position[1]
-    delta = target_x - current_x
+
+    # déplacement horizontal
+    delta = best_position[1] - current_x
     if delta < 0:
         for _ in range(-delta):
             keyboard.press_and_release(move_left_key)
     elif delta > 0:
         for _ in range(delta):
             keyboard.press_and_release(move_right_key)
+
     # hard drop
     keyboard.press_and_release(drop_key)
-    
+
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
     board_coords = (top_left_x, top_left_y, bottom_right_x, bottom_right_y)
     time.sleep(0.01)
@@ -475,6 +490,6 @@ while True:
             
             # limiter la vitesse de la boucle pour ne pas trop flooder
             elapsed = time.time() - start_time
-            min_loop = 0.05  # 50 ms minimum par loop
+            min_loop = 0.08  # 80ms par loop
             if elapsed < min_loop:
                 time.sleep(min_loop - elapsed)
