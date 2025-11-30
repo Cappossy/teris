@@ -1,6 +1,7 @@
 import keyboard
 import time
 import numpy as np
+import random 
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
@@ -326,39 +327,33 @@ def key_press(best_position, best_rotation):
     print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
-        time.sleep(random.uniform(0.03, 0.08))
-        keyboard.release(rotate_clockwise_key)
         time.sleep(random.uniform(0.02, 0.05))
+        keyboard.release(rotate_clockwise_key);
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
-        time.sleep(random.uniform(0.03, 0.08))
-        keyboard.release(rotate_180_key)
         time.sleep(random.uniform(0.02, 0.05))
+        keyboard.release(rotate_180_key);
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
-        time.sleep(random.uniform(0.03, 0.08))
-        keyboard.release(rotate_counterclockwise_key)
         time.sleep(random.uniform(0.02, 0.05))
+        keyboard.release(rotate_counterclockwise_key);
 
     # move left or right
     if best_position[1] < 3:
         for i in range(3 - best_position[1]):
             keyboard.press(move_left_key)
-            time.sleep(random.uniform(0.03, 0.08))
-            keyboard.release(move_left_key)
             time.sleep(random.uniform(0.02, 0.05))
+            keyboard.release(move_left_key);
     elif best_position[1] > 3:
         for i in range(best_position[1] - 3):
             keyboard.press(move_right_key)
-            time.sleep(random.uniform(0.03, 0.08))
-            keyboard.release(move_right_key)
             time.sleep(random.uniform(0.02, 0.05))
+            keyboard.release(move_right_key);
 
     # drop piece
     keyboard.press('space')
-    time.sleep(random.uniform(0.03, 0.08))
-    keyboard.release('space')
     time.sleep(random.uniform(0.02, 0.05))
+    keyboard.release('space')
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
