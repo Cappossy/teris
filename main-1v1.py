@@ -7,13 +7,13 @@ from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 import pyautogui # somehow the mouse get_position doesn't work
 
-x1_board, y1_board = 825,252 # top left of board
-x2_board, y2_board = 1147,894 # bottom right of board
-x1, y1 = 1251,328
+x1_board, y1_board = 478, 250 # top left of board
+x2_board, y2_board = 802, 890 # bottom right of board
+x1, y1 = 884,338
 x2, y2 = 0, 0
 x3, y3 = 0, 0
 x4, y4 = 0, 0
-x5, y5 = 1256,726
+x5, y5 = 892,731
 
 
 pixel_area = 30 # number of pixels to check for color - auto
