@@ -26,9 +26,9 @@ move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 5 # number of best moves to keep at each depth - higher number means more accurate but slower
+calculation_accuracy = 6 # number of best moves to keep at each depth - higher number means more accurate but slower
 max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
-wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
+wait_time = 0.05 # time to wait, can't go too low because you need to wait for screen to refresh
 scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
 jstris = False # jstris mode - changes colors
 
@@ -115,7 +115,7 @@ tetris_pieces = {
 
 def evaluate_board(board):
     # Find highest block row
-    highest_block_row = 21
+    highest_block_row = 30
     for row in range(board.shape[0]):
         if not np.any(board[row] == 1):
             highest_block_row = row
@@ -150,11 +150,11 @@ def evaluate_board(board):
                 break
 
     # --- Nouvelle partie : bonus pour clears multiples ---
-    if num_cleared_rows == 2:
-        cleared_bonus = 30
-    elif num_cleared_rows == 3:
-        cleared_bonus = 60
+    if num_cleared_rows == 3:
+        cleared_bonus = 40
     elif num_cleared_rows == 4:
+        cleared_bonus = 70
+    elif num_cleared_rows == 6:
         cleared_bonus = 100  # Tetris
     else:
         cleared_bonus = 0
@@ -162,7 +162,7 @@ def evaluate_board(board):
     # Bonus pour garder un puits vide à droite pour Tetris
     well_bonus = 0
     if np.all(board[:, -1] == 0):
-        well_bonus = 10
+        well_bonus = 30
 
     # Poids heuristiques
     A, B, C, D, E = -1, 10, -50, -1, -1
@@ -357,32 +357,32 @@ def key_press(best_position, best_rotation):
     print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
-        time.sleep(random.uniform(0.05, 0.05))
+        time.sleep(random.uniform(0.03, 0.05))
         keyboard.release(rotate_clockwise_key);
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
-        time.sleep(random.uniform(0.02, 0.05))
+        time.sleep(random.uniform(0.03, 0.05))
         keyboard.release(rotate_180_key);
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
-        time.sleep(random.uniform(0.02, 0.05))
+        time.sleep(random.uniform(0.03, 0.05))
         keyboard.release(rotate_counterclockwise_key);
 
     # move left or right
     if best_position[1] < 3:
         for i in range(3 - best_position[1]):
             keyboard.press(move_left_key)
-            time.sleep(random.uniform(0.02, 0.05))
+            time.sleep(random.uniform(0.03, 0.05))
             keyboard.release(move_left_key);
     elif best_position[1] > 3:
         for i in range(best_position[1] - 3):
             keyboard.press(move_right_key)
-            time.sleep(random.uniform(0.02, 0.05))
+            time.sleep(random.uniform(0.03, 0.05))
             keyboard.release(move_right_key);
 
     # drop piece
     keyboard.press('space')
-    time.sleep(random.uniform(0.05, 0.08))
+    time.sleep(random.uniform(0.03, 0.05))
     keyboard.release('space')
 
 
