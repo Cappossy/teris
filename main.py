@@ -112,6 +112,46 @@ tetris_pieces = {
     ]
 }
 
+def human_delay(min_delay=0.02, max_delay=0.08):
+    """Simule le délai humain entre les touches."""
+    time.sleep(random.uniform(min_delay, max_delay))
+
+def choose_position_human(positions_scores, humanity=0.85):
+    """
+    Choisit la meilleure position mais parfois une position sub-optimale pour humaniser le bot.
+    humanity: float 0-1, plus proche de 1 = bot plus optimal
+    """
+    # Trier par score décroissant
+    positions_scores.sort(key=lambda x: x[1], reverse=True)
+    top_k = max(1, int(len(positions_scores) * humanity))  # top positions à considérer
+    chosen = random.choice(positions_scores[:top_k])
+    return chosen
+
+# --- Remplace la sélection normale par choose_position_human dans ton code --- #
+# Exemple pour find_best_position / boucle principale
+
+positions_scores = []
+for rotated_block in rotated_blocks:
+    for pos in get_positions(board, rotated_block):
+        new_board = simulate_drop(board, rotated_block, pos)
+        score = evaluate_board(new_board)
+        positions_scores.append((pos, score))
+
+# Au lieu de choisir le top score directement
+best_pos, best_score = choose_position_human(positions_scores, humanity=0.85)
+
+# --- Pour chaque key_press ---
+def press_key_human(key):
+    """Simule appui humain d'une touche avec délai aléatoire."""
+    keyboard.press(key)
+    human_delay(0.03, 0.08)
+    keyboard.release(key)
+    human_delay(0.02, 0.05)
+
+# Utilisation
+press_key_human(move_left_key)
+press_key_human(rotate_clockwise_key)
+press_key_human(drop_key)
 
 def evaluate_board(board):
     # Implement your heuristic function here
