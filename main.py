@@ -330,7 +330,7 @@ def key_press(best_position, best_rotation, current_x=3):
     import random
 
     def human_delay():
-        time.sleep(random.uniform(0.03, 0.05))  # 15 à 50 ms entre actions
+        time.sleep(random.uniform(0.03, 0.05))
 
     # Rotation
     if best_rotation == 1:
@@ -354,6 +354,34 @@ def key_press(best_position, best_rotation, current_x=3):
     # Hard drop
     keyboard.press_and_release(drop_key)
     human_delay()
+
+
+# calcul de la meilleure position
+best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
+
+# récupérer la matrice de la pièce
+best_piece_pos_rot = piece_array[0][best_rotation]
+piece_array.pop(0)
+
+# ajuster offset si besoin
+if isinstance(best_piece_pos_rot, np.ndarray):
+    offset = 0
+    for i in range(best_piece_pos_rot.shape[1]):
+        if not any(best_piece_pos_rot[:, i]):
+            offset += 1
+        else:
+            break
+    best_position2 = (best_position[0], best_position[1] - offset)
+else:
+    best_position2 = best_position
+
+# ici on fait tomber la pièce avec la fonction key_press
+key_press(best_position2, best_rotation)
+
+# puis on ajoute la pièce sur le board et on clear les lignes
+clean_piece = best_piece_pos_rot.copy()
+tetrisboard.add_piece(clean_piece, best_position2)
+tetrisboard.clear_full_rows()
 
 
 
@@ -533,8 +561,6 @@ while True:
             # clean padding
             best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
             best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
-
-            tetrisboard.add_piece(best_piece_pos_rot, best_position2)
 
             time.sleep(wait_time)
             print("total time: ", time.time() - start_time)
