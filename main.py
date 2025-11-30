@@ -504,20 +504,18 @@ while True:
             piece_array.pop(0)
 
             # ----- OFFSET FIX -----
+            offset = 0
             if isinstance(best_piece_pos_rot, np.ndarray):
-                offset = 0
                 for i in range(best_piece_pos_rot.shape[1]):
                     if not any(best_piece_pos_rot[:, i]):
                         offset += 1
-                    else:
-                        break
-                best_position2 = (best_position[0], best_position[1] - offset)
             else:
-                best_position2 = best_position  # fallback
+                break
+            best_position2 = (best_position[0], best_position[1] - offset)
 
             # key presses
             start_time4 = time.time()
-            key_press(best_position2, best_rotation)
+            key_press(best_position, best_rotation)
             print("time for key presses: ", time.time() - start_time4)
 
             # clean padding
@@ -525,7 +523,6 @@ while True:
             best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
 
             tetrisboard.add_piece(best_piece_pos_rot, best_position)
-            tetrisboard.clear_full_rows()
 
             time.sleep(wait_time)
             print("total time: ", time.time() - start_time)
