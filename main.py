@@ -6,13 +6,13 @@ from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
 import pyautogui # somehow the mouse get_position doesn't work
 
-x1_board, y1_board = 1341,375 # top left of board
-x2_board, y2_board = 1512,715 # bottom right of board
-x1, y1 = 1564,418
+x1_board, y1_board = 825,252 # top left of board
+x2_board, y2_board = 1147,894 # bottom right of board
+x1, y1 = 1251,328
 x2, y2 = 0, 0
 x3, y3 = 0, 0
 x4, y4 = 0, 0
-x5, y5 = 1565,622
+x5, y5 = 1256,726
 
 
 pixel_area = 30 # number of pixels to check for color - auto
@@ -111,47 +111,6 @@ tetris_pieces = {
         np.array([[0, 0, 1, 0], [0, 1, 1, 0], [0, 1, 0, 0]])
     ]
 }
-
-def human_delay(min_delay=0.02, max_delay=0.08):
-    """Simule le délai humain entre les touches."""
-    time.sleep(random.uniform(min_delay, max_delay))
-
-def choose_position_human(positions_scores, humanity=0.85):
-    """
-    Choisit la meilleure position mais parfois une position sub-optimale pour humaniser le bot.
-    humanity: float 0-1, plus proche de 1 = bot plus optimal
-    """
-    # Trier par score décroissant
-    positions_scores.sort(key=lambda x: x[1], reverse=True)
-    top_k = max(1, int(len(positions_scores) * humanity))  # top positions à considérer
-    chosen = random.choice(positions_scores[:top_k])
-    return chosen
-
-# --- Remplace la sélection normale par choose_position_human dans ton code --- #
-# Exemple pour find_best_position / boucle principale
-
-positions_scores = []
-for rotated_block in rotated_blocks:
-    for pos in get_positions(board, rotated_block):
-        new_board = simulate_drop(board, rotated_block, pos)
-        score = evaluate_board(new_board)
-        positions_scores.append((pos, score))
-
-# Au lieu de choisir le top score directement
-best_pos, best_score = choose_position_human(positions_scores, humanity=0.85)
-
-# --- Pour chaque key_press ---
-def press_key_human(key):
-    """Simule appui humain d'une touche avec délai aléatoire."""
-    keyboard.press(key)
-    human_delay(0.03, 0.08)
-    keyboard.release(key)
-    human_delay(0.02, 0.05)
-
-# Utilisation
-press_key_human(move_left_key)
-press_key_human(rotate_clockwise_key)
-press_key_human(drop_key)
 
 def evaluate_board(board):
     # Implement your heuristic function here
@@ -367,37 +326,39 @@ def key_press(best_position, best_rotation):
     print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
+        time.sleep(random.uniform(0.03, 0.08))
         keyboard.release(rotate_clockwise_key)
-        if key_delay > 0:
-            time.sleep(key_delay)
+        time.sleep(random.uniform(0.02, 0.05))
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
+        time.sleep(random.uniform(0.03, 0.08))
         keyboard.release(rotate_180_key)
-        if key_delay > 0:
-            time.sleep(key_delay)
+        time.sleep(random.uniform(0.02, 0.05))
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
+        time.sleep(random.uniform(0.03, 0.08))
         keyboard.release(rotate_counterclockwise_key)
-        if key_delay > 0:
-            time.sleep(key_delay)
-    # press left arrow or right arrow to move to position
+        time.sleep(random.uniform(0.02, 0.05))
+
+    # move left or right
     if best_position[1] < 3:
         for i in range(3 - best_position[1]):
             keyboard.press(move_left_key)
+            time.sleep(random.uniform(0.03, 0.08))
             keyboard.release(move_left_key)
-            if key_delay > 0:
-                time.sleep(key_delay)
+            time.sleep(random.uniform(0.02, 0.05))
     elif best_position[1] > 3:
         for i in range(best_position[1] - 3):
             keyboard.press(move_right_key)
+            time.sleep(random.uniform(0.03, 0.08))
             keyboard.release(move_right_key)
-            if key_delay > 0:
-                time.sleep(key_delay)
-    # press space to drop piece
+            time.sleep(random.uniform(0.02, 0.05))
+
+    # drop piece
     keyboard.press('space')
+    time.sleep(random.uniform(0.03, 0.08))
     keyboard.release('space')
-    if key_delay > 0:
-        time.sleep(key_delay)
+    time.sleep(random.uniform(0.02, 0.05))
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -435,22 +396,22 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
 
 # start program
 while True:
-    if keyboard.is_pressed('['):
+    if keyboard.is_pressed('1'):
         x1, y1 = pyautogui.position()
         print(f"first piece: {x1},{y1}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed(']'):
+    if keyboard.is_pressed('2'):
         x5, y5 = pyautogui.position()
         print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
     
-    if keyboard.is_pressed('-'):
+    if keyboard.is_pressed('3'):
         x1_board, y1_board = pyautogui.position()
         print(f"top left: {x1_board},{y1_board}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed('='):
+    if keyboard.is_pressed('4'):
         x2_board, y2_board = pyautogui.position()
         print(f"bottom right: {x2_board},{y2_board}")
         time.sleep(0.2)
