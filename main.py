@@ -330,7 +330,7 @@ def key_press(best_position, best_rotation, current_x=3):
     import random
 
     def human_delay():
-        time.sleep(random.uniform(0.03, 0.05))
+        time.sleep(random.uniform(0.03, 0.05))  # délai humain
 
     # Rotation
     if best_rotation == 1:
@@ -354,34 +354,6 @@ def key_press(best_position, best_rotation, current_x=3):
     # Hard drop
     keyboard.press_and_release(drop_key)
     human_delay()
-
-
-# calcul de la meilleure position
-best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
-
-# récupérer la matrice de la pièce
-best_piece_pos_rot = piece_array[0][best_rotation]
-piece_array.pop(0)
-
-# ajuster offset si besoin
-if isinstance(best_piece_pos_rot, np.ndarray):
-    offset = 0
-    for i in range(best_piece_pos_rot.shape[1]):
-        if not any(best_piece_pos_rot[:, i]):
-            offset += 1
-        else:
-            break
-    best_position2 = (best_position[0], best_position[1] - offset)
-else:
-    best_position2 = best_position
-
-# ici on fait tomber la pièce avec la fonction key_press
-key_press(best_position2, best_rotation)
-
-# puis on ajoute la pièce sur le board et on clear les lignes
-clean_piece = best_piece_pos_rot.copy()
-tetrisboard.add_piece(clean_piece, best_position2)
-tetrisboard.clear_full_rows()
 
 
 
@@ -471,105 +443,83 @@ while True:
         print(f'Closest color: {closest_color4}')
         print(f'Closest color: {closest_color5}')
         first_move = True
-        while True:
-            # set break key
-            if keyboard.is_pressed('esc'):
-                break
+while True:
+    if keyboard.is_pressed('esc'):
+        break
+    if keyboard.is_pressed(';'):
+        board_initialized = False
+        break
 
-            # restart
-            if keyboard.is_pressed(';'):
-                board_initialized = False
-                break
+    # verrouiller jusqu'à ce que la pièce change
+    if first_move:
+        closest_color1_0 = closest_color_in_area(colors, x1, y1)
+        closest_color2_0 = closest_color_in_area(colors, x2, y2)
+        if closest_color2 != closest_color2_0 or closest_color1 != closest_color1_0:
+            first_move = False
+        else:
+            continue
 
-            # lock until piece changes
-            if first_move:
-                closest_color1_0 = closest_color_in_area(colors, x1, y1)
-                closest_color2_0 = closest_color_in_area(colors, x2, y2)
-                if closest_color2 != closest_color2_0 or closest_color1 != closest_color1_0:
-                    first_move = False
-                else:
-                    continue
+    start_time = time.time()
 
-            # total time
-            start_time = time.time()
+    # récupérer la couleur et la pièce
+    closest_color5 = closest_color_in_area(colors, x5, y5)
+    piece = get_piece_based_on_color(closest_color5, colors)
+    if piece is not None:
+        piece_array.append(piece)
+    else:
+        print("⚠️ Pièce non détectée, fallback activé")
+        piece_array.append(np.zeros((4,4)))  # fallback
 
-            # time to get color
-            start_time3 = time.time()
-            closest_color5 = closest_color_in_area(colors, x5, y5)
-            piece_array.append(get_piece_based_on_color(closest_color5, colors))
-            print("time for get color: ", time.time() - start_time3)
+    # scanner le board si nécessaire
+    if scan_board:
+        tetrisboard.board = get_tetris_board_from_screen(x1_board, y1_board, x2_board, y2_board)
 
-            if scan_board:
-                # time to get board
-                start_time2 = time.time()
-                tetrisboard.board = get_tetris_board_from_screen(x1_board, y1_board, x2_board, y2_board)
-                for row in reversed(tetrisboard.board):
-                    print(row)
-                print("time for get board: ", time.time() - start_time2)
+    # --- calcul de la meilleure position ---
+    best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
 
-            # compute best move
-            start_time2 = time.time()
-            best_position, best_rotation = find_best_position(tetrisboard.board, piece_array.copy(), max_depth)
-            print("time for find_best_position: ", time.time() - start_time2)
+    if best_position is None or best_rotation is None:
+        print("⚠️ Aucune position valide trouvée, fallback")
+        time.sleep(0.05)
+        continue
 
-            # --- protection : aucune position trouvée ---
-            if best_position is None or best_rotation is None:
-                print("Aucune position valide trouvée → sécurité anti-spam activée")
-                time.sleep(0.05)
-                continue
+    # --- protection si board trop haut ---
+    max_height = max((i for i, row in enumerate(tetrisboard.board) if any(row)), default=0)
+    if max_height > 18:
+        print("⚠️ Board trop haut → ralentissement")
+        time.sleep(0.05)
+        continue
 
-            # --- protection : board trop haut ---
-            max_height = max((i for i, row in enumerate(tetrisboard.board) if any(row)), default=0)
-            if max_height > 18:
-                print("⚠️ Board trop haut → ralentissement pour éviter erreur")
-                time.sleep(0.05)
-                continue
+    # sécuriser best_piece_pos_rot
+    if not piece_array:
+        piece_array.append(np.zeros((4,4)))  # fallback
+    best_piece_pos_rot = piece_array[0][best_rotation % len(piece_array[0])]
+    piece_array.pop(0)
 
-            # best piece rotation matrix
-            best_piece_pos_rot = piece_array[0][best_rotation]
-
-            # remove first piece
-            piece_array.pop(0)
-
-            # ----- OFFSET FIX -----
-            offset = 0
-            if isinstance(best_piece_pos_rot, np.ndarray):
-                for i in range(best_piece_pos_rot.shape[1]):
-                    if not any(best_piece_pos_rot[:, i]):
-                        offset += 1
+    # OFFSET
+    if isinstance(best_piece_pos_rot, np.ndarray):
+        offset = 0
+        for i in range(best_piece_pos_rot.shape[1]):
+            if not any(best_piece_pos_rot[:, i]):
+                offset += 1
             else:
                 break
+        best_position2 = (best_position[0], best_position[1] - offset)
+    else:
+        best_position2 = best_position
 
-            # appliquer offset
-            best_position2 = (best_position[0], best_position[1] - offset)
+    # tomber la pièce
+    key_press(best_position2, best_rotation)
 
-            # clean padding AVANT d'ajouter la pièce
-            clean_piece = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
-            clean_piece = clean_piece[:, ~np.all(clean_piece == 0, axis=0)]
+    # ajouter la pièce et nettoyer
+    clean_piece = best_piece_pos_rot.copy()
+    tetrisboard.add_piece(clean_piece, best_position2)
+    tetrisboard.clear_full_rows()
 
-            # key presses
-            start_time4 = time.time()
-            key_press(best_position, best_rotation)
-            print("time for key presses: ", time.time() - start_time4)
-
-            # ajouter la pièce dans la simulation AVEC LA MÊME POSITION
-            tetrisboard.add_piece(clean_piece, best_position2)
-
-            # clear rows
-            tetrisboard.clear_full_rows()
-
-            # clean padding
-            best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
-            best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
-
-            time.sleep(wait_time)
-            print("total time: ", time.time() - start_time)
-
-            # minimum loop time
-            elapsed = time.time() - start_time
-            min_loop = 0.08
-            if elapsed < min_loop:
-                time.sleep(min_loop - elapsed)
+    # limiter vitesse de la boucle
+    elapsed = time.time() - start_time
+    min_loop = 0.08  # 80ms minimum
+    if elapsed < min_loop:
+        time.sleep(min_loop - elapsed)
 
 def closest_color_in_area(colors, x, y):
     min_diff = float('inf')
