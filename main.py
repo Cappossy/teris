@@ -115,7 +115,7 @@ tetris_pieces = {
 
 def evaluate_board(board):
     # Find highest block row
-    highest_block_row = 20
+    highest_block_row = 21
     for row in range(board.shape[0]):
         if not np.any(board[row] == 1):
             highest_block_row = row
@@ -150,11 +150,11 @@ def evaluate_board(board):
                 break
 
     # --- Nouvelle partie : bonus pour clears multiples ---
-    if num_cleared_rows == 3:
+    if num_cleared_rows == 2:
         cleared_bonus = 30
-    elif num_cleared_rows == 4:
+    elif num_cleared_rows == 3:
         cleared_bonus = 60
-    elif num_cleared_rows == 5:
+    elif num_cleared_rows == 4:
         cleared_bonus = 100  # Tetris
     else:
         cleared_bonus = 0
@@ -357,7 +357,7 @@ def key_press(best_position, best_rotation):
     print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
-        time.sleep(random.uniform(0.02, 0.05))
+        time.sleep(random.uniform(0.05, 0.05))
         keyboard.release(rotate_clockwise_key);
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
@@ -382,7 +382,7 @@ def key_press(best_position, best_rotation):
 
     # drop piece
     keyboard.press('space')
-    time.sleep(random.uniform(0.02, 0.05))
+    time.sleep(random.uniform(0.05, 0.08))
     keyboard.release('space')
 
 
