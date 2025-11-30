@@ -114,30 +114,34 @@ tetris_pieces = {
 }
 
 def evaluate_board(board):
-    # Implement your heuristic function here
-    # The height of the tallest column - find highest row with a 1
+    # Find highest block row
     highest_block_row = 20
     for row in range(board.shape[0]):
         if not np.any(board[row] == 1):
             highest_block_row = row
             break
-    # The sum of max height block in each column - the bottom of the board is index 0
+
+    # Sum of column heights
     sum_of_heights = 0
     for col in range(board.shape[1]):
         for row in reversed(range(board.shape[0])):
             if board[row][col] == 1:
                 sum_of_heights += row + 1
                 break
+
+    # Cleared rows
     num_cleared_rows = np.sum(np.all(board == 1, axis=1))
-    # The number of holes - find number of 0s with 1s above
+
+    # Holes
     holes = np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
-    # The number of blockades - find number of 1s with 0s above
+
+    # Blockades
     blockades = np.sum((board == 1) & (np.cumsum(board, axis=0) > 0))
-    # assign higher weights to higher blocks
+
+    # Weighted heights
     weighted_heights = 0
     for col in range(board.shape[1]):
         for row in reversed(range(board.shape[0])):
-            # find highest block in each column
             if board[row][col] == 1:
                 if row > 5:
                     weighted_heights += (row + 1) * (row + 1 - 5)
@@ -145,9 +149,35 @@ def evaluate_board(board):
                     weighted_heights += (row + 1)
                 break
 
+    # --- Nouvelle partie : bonus pour clears multiples ---
+    if num_cleared_rows == 3:
+        cleared_bonus = 30
+    elif num_cleared_rows == 4:
+        cleared_bonus = 60
+    elif num_cleared_rows == 5:
+        cleared_bonus = 100  # Tetris
+    else:
+        cleared_bonus = 0
+
+    # Bonus pour garder un puits vide à droite pour Tetris
+    well_bonus = 0
+    if np.all(board[:, -1] == 0):
+        well_bonus = 10
+
+    # Poids heuristiques
     A, B, C, D, E = -1, 10, -50, -1, -1
-    score = A * weighted_heights + B * num_cleared_rows * num_cleared_rows * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
+    score = (
+        A * weighted_heights
+        + B * num_cleared_rows * num_cleared_rows * num_cleared_rows
+        + C * holes
+        + D * blockades
+        + E * highest_block_row
+        + cleared_bonus
+        + well_bonus
+    )
+
     return score
+
 
 def get_positions(board, rotated_block):
     # Return a list of all possible positions for the given block and rotation
