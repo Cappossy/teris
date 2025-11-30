@@ -511,18 +511,30 @@ while True:
                         offset += 1
             else:
                 break
+
+            # appliquer offset
             best_position2 = (best_position[0], best_position[1] - offset)
+
+            # clean padding AVANT d'ajouter la pièce
+            clean_piece = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
+            clean_piece = clean_piece[:, ~np.all(clean_piece == 0, axis=0)]
 
             # key presses
             start_time4 = time.time()
             key_press(best_position, best_rotation)
             print("time for key presses: ", time.time() - start_time4)
 
+            # ajouter la pièce dans la simulation AVEC LA MÊME POSITION
+            tetrisboard.add_piece(clean_piece, best_position2)
+
+            # clear rows
+            tetrisboard.clear_full_rows()
+
             # clean padding
             best_piece_pos_rot = best_piece_pos_rot[~np.all(best_piece_pos_rot == 0, axis=1)]
             best_piece_pos_rot = best_piece_pos_rot[:, ~np.all(best_piece_pos_rot == 0, axis=0)]
 
-            tetrisboard.add_piece(best_piece_pos_rot, best_position)
+            tetrisboard.add_piece(best_piece_pos_rot, best_position2)
 
             time.sleep(wait_time)
             print("total time: ", time.time() - start_time)
