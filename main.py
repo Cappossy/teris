@@ -150,11 +150,11 @@ def evaluate_board(board):
                 break
 
     # --- Nouvelle partie : bonus pour clears multiples ---
-    if num_cleared_rows == 3:
-        cleared_bonus = 40
+    if num_cleared_rows == 2:
+        cleared_bonus = 30
     elif num_cleared_rows == 4:
-        cleared_bonus = 70
-    elif num_cleared_rows == 6:
+        cleared_bonus = 40
+    elif num_cleared_rows == 5:
         cleared_bonus = 100  # Tetris
     else:
         cleared_bonus = 0
@@ -162,7 +162,7 @@ def evaluate_board(board):
     # Bonus pour garder un puits vide à droite pour Tetris
     well_bonus = 0
     if np.all(board[:, -1] == 0):
-        well_bonus = 38
+        well_bonus = 30
 
     # Poids heuristiques
     A, B, C, D, E = -1, 10, -50, -1, -1
