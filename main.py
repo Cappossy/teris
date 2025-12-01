@@ -162,7 +162,7 @@ def evaluate_board(board):
     # Bonus pour garder un puits vide à droite pour Tetris
     well_bonus = 0
     if np.all(board[:, -1] == 0):
-        well_bonus = 50
+        well_bonus = 38
 
     # Poids heuristiques
     A, B, C, D, E = -1, 10, -50, -1, -1
