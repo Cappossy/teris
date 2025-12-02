@@ -113,6 +113,10 @@ tetris_pieces = {
     ]
 }
 
+def human_delay():
+    time.sleep(random.uniform(0.002, 0.006))
+
+
 def evaluate_board(board):
     # Find highest block row
     highest_block_row = 30
@@ -353,37 +357,53 @@ board_initialized = False
 piece_array = []
 
 def key_press(best_position, best_rotation):
-    # rotate
-    print("best rotation: " + str(best_rotation))
+    import random, time
+
+    # Timings pour 65‑75 APM, reste crédible humainement
+    ROTATE_DELAY = random.uniform(0.020, 0.035)
+    MOVE_DELAY   = random.uniform(0.020, 0.030)
+    DROP_DELAY   = random.uniform(0.010, 0.018)
+    HUMAN_VARI   = random.uniform(0.002, 0.007)
+
+    # Rotation
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
-        time.sleep(random.uniform(0.02, 0.05))
-        keyboard.release(rotate_clockwise_key);
+        time.sleep(ROTATE_DELAY + HUMAN_VARI)
+        keyboard.release(rotate_clockwise_key)
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
-        time.sleep(random.uniform(0.02, 0.05))
-        keyboard.release(rotate_180_key);
+        time.sleep((ROTATE_DELAY * 1.2) + HUMAN_VARI)
+        keyboard.release(rotate_180_key)
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
-        time.sleep(random.uniform(0.02, 0.05))
-        keyboard.release(rotate_counterclockwise_key);
+        time.sleep(ROTATE_DELAY + HUMAN_VARI)
+        keyboard.release(rotate_counterclockwise_key)
 
-    # move left or right
-    if best_position[1] < 3:
-        for i in range(3 - best_position[1]):
+    # Mini pause avant déplacement
+    time.sleep(random.uniform(0.002, 0.005))
+
+    # Déplacement horizontal
+    x_target = best_position[1]
+    x_current = 3
+    delta = x_target - x_current
+
+    if delta < 0:
+        for _ in range(abs(delta)):
             keyboard.press(move_left_key)
-            time.sleep(random.uniform(0.02, 0.05))
-            keyboard.release(move_left_key);
-    elif best_position[1] > 3:
-        for i in range(best_position[1] - 3):
+            time.sleep(MOVE_DELAY + HUMAN_VARI)
+            keyboard.release(move_left_key)
+    elif delta > 0:
+        for _ in range(delta):
             keyboard.press(move_right_key)
-            time.sleep(random.uniform(0.02, 0.05))
-            keyboard.release(move_right_key);
+            time.sleep(MOVE_DELAY + HUMAN_VARI)
+            keyboard.release(move_right_key)
 
-    # drop piece
+    # Hard drop
     keyboard.press('space')
-    time.sleep(random.uniform(0.02, 0.05))
+    time.sleep(DROP_DELAY + HUMAN_VARI)
     keyboard.release('space')
+
+
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
