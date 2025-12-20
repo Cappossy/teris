@@ -4,27 +4,18 @@ import numpy as np
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
-import pyautogui
+import pyautogui # somehow the mouse get_position doesn't work
 
-# Board coordinates
-x1_board, y1_board = 823, 251  # top left
-x2_board, y2_board = 1145, 889  # bottom right
+x1_board, y1_board = 825,252 # top left of board
+x2_board, y2_board = 1147,894 # bottom right of board
+x1, y1 = 1251,328
+x2, y2 = 0, 0
+x3, y3 = 0, 0
+x4, y4 = 0, 0
+x5, y5 = 1256,726
 
-# Piece coordinates
-x1, y1 = 1250, 326  # first piece
-x5, y5 = 1243, 736  # fifth piece
 
-# Calculated intermediate piece positions
-x2, y2 = (x1 + x5)//2, y1 + math.floor((y5 - y1)/4*1)
-x3, y3 = (x1 + x5)//2, y1 + math.floor((y5 - y1)/4*2)
-x4, y4 = (x1 + x5)//2, y1 + math.floor((y5 - y1)/4*3)
-
-# Pixel area pour la détection des couleurs
-pixel_area = (y5 - y1)//10
-
-# Plus besoin de refaire la calibration 1,2,3,4
-board_initialized = True
-
+pixel_area = 30 # number of pixels to check for color - auto
 
 # keybinds
 rotate_clockwise_key = 'x' # for some reason this is the only key that works - 'up' doesn't work
@@ -34,7 +25,7 @@ move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 7 # number of best moves to keep at each depth - higher number means more accurate but slower
+calculation_accuracy = 5 # number of best moves to keep at each depth - higher number means more accurate but slower
 max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
 wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
 scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
@@ -123,39 +114,30 @@ tetris_pieces = {
 
 
 def evaluate_board(board):
-    # Hauteur max et bloc le plus haut
+    # Implement your heuristic function here
+    # The height of the tallest column - find highest row with a 1
     highest_block_row = 20
     for row in range(board.shape[0]):
         if not np.any(board[row] == 1):
             highest_block_row = row
             break
-
-    # Somme des hauteurs par colonne
+    # The sum of max height block in each column - the bottom of the board is index 0
     sum_of_heights = 0
-    heights = []
     for col in range(board.shape[1]):
-        col_height = 0
         for row in reversed(range(board.shape[0])):
             if board[row][col] == 1:
-                col_height = row + 1
+                sum_of_heights += row + 1
                 break
-        sum_of_heights += col_height
-        heights.append(col_height)
-
-    # Lignes complétées
     num_cleared_rows = np.sum(np.all(board == 1, axis=1))
-
-    # Trous et blocages
+    # The number of holes - find number of 0s with 1s above
     holes = np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
+    # The number of blockades - find number of 1s with 0s above
     blockades = np.sum((board == 1) & (np.cumsum(board, axis=0) > 0))
-
-    # Différence de hauteur entre colonnes pour lisser le plateau
-    height_diff = max(heights) - min(heights)
-
-    # Weighted heights (légèrement plus lourd pour les blocs très hauts)
+    # assign higher weights to higher blocks
     weighted_heights = 0
     for col in range(board.shape[1]):
         for row in reversed(range(board.shape[0])):
+            # find highest block in each column
             if board[row][col] == 1:
                 if row > 5:
                     weighted_heights += (row + 1) * (row + 1 - 5)
@@ -163,16 +145,9 @@ def evaluate_board(board):
                     weighted_heights += (row + 1)
                 break
 
-    # Nouvelle formule de score
-    A, B, C, D, E, F = -1, 12, -55, -1, -1, -3
-    score = (A * weighted_heights +
-             B * num_cleared_rows**3 +
-             C * holes +
-             D * blockades +
-             E * highest_block_row +
-             F * height_diff)
+    A, B, C, D, E = -1, 10, -50, -1, -1
+    score = A * weighted_heights + B * num_cleared_rows * num_cleared_rows * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
     return score
-
 
 def get_positions(board, rotated_block):
     # Return a list of all possible positions for the given block and rotation
@@ -348,44 +323,41 @@ board_initialized = False
 piece_array = []
 
 def key_press(best_position, best_rotation):
-    import random
-    
-    
-    # Petit délai humain entre actions
-    def human_delay():
-        time.sleep(random.uniform(0.015, 0.065))
-
-    # Rotation
+    # rotate
+    print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
-        keyboard.press_and_release(rotate_clockwise_key)
-        human_delay()
+        keyboard.press(rotate_clockwise_key)
+        keyboard.release(rotate_clockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 2:
-        keyboard.press_and_release(rotate_180_key)
-        human_delay()
+        keyboard.press(rotate_180_key)
+        keyboard.release(rotate_180_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 3:
-        keyboard.press_and_release(rotate_counterclockwise_key)
-        human_delay()
-
-    # Déplacement horizontal
-    current_x = 3  # position de départ approximative
-    target_x = best_position[1]
-
-    if target_x < current_x:
-        for _ in range(current_x - target_x):
-            keyboard.press_and_release(move_left_key)
-            human_delay()
-    elif target_x > current_x:
-        for _ in range(target_x - current_x):
-            keyboard.press_and_release(move_right_key)
-            human_delay()
-
-    # Micro-hésitation comme un humain
-    time.sleep(random.uniform(0.03, 0.11))
-
-    # Hard drop
-    keyboard.press_and_release(drop_key)
-    human_delay()
-
+        keyboard.press(rotate_counterclockwise_key)
+        keyboard.release(rotate_counterclockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
+    # press left arrow or right arrow to move to position
+    if best_position[1] < 3:
+        for i in range(3 - best_position[1]):
+            keyboard.press(move_left_key)
+            keyboard.release(move_left_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
+    elif best_position[1] > 3:
+        for i in range(best_position[1] - 3):
+            keyboard.press(move_right_key)
+            keyboard.release(move_right_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
+    # press space to drop piece
+    keyboard.press('space')
+    keyboard.release('space')
+    if key_delay > 0:
+        time.sleep(key_delay)
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -423,22 +395,22 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
 
 # start program
 while True:
-    if keyboard.is_pressed('1'):
+    if keyboard.is_pressed('['):
         x1, y1 = pyautogui.position()
         print(f"first piece: {x1},{y1}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed('2'):
+    if keyboard.is_pressed(']'):
         x5, y5 = pyautogui.position()
         print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
     
-    if keyboard.is_pressed('3'):
+    if keyboard.is_pressed('-'):
         x1_board, y1_board = pyautogui.position()
         print(f"top left: {x1_board},{y1_board}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed('4'):
+    if keyboard.is_pressed('='):
         x2_board, y2_board = pyautogui.position()
         print(f"bottom right: {x2_board},{y2_board}")
         time.sleep(0.2)
