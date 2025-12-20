@@ -360,27 +360,27 @@ def key_press(best_position, best_rotation):
     import random, time
 
     # Timings pour 65‑75 APM, reste crédible humainement
-    ROTATE_DELAY = random.uniform(0.020, 0.035)
-    MOVE_DELAY   = random.uniform(0.020, 0.030)
+    ROTATE_DELAY = random.uniform(0.020, 0.030)
+    MOVE_DELAY   = random.uniform(0.015, 0.025)
     DROP_DELAY   = random.uniform(0.010, 0.018)
-    HUMAN_VARI   = random.uniform(0.002, 0.007)
+   #HUMAN_VARI   = random.uniform(0.002, 0.007)
 
     # Rotation
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
-        time.sleep(ROTATE_DELAY + HUMAN_VARI)
+        time.sleep(ROTATE_DELAY)
         keyboard.release(rotate_clockwise_key)
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
-        time.sleep((ROTATE_DELAY * 1.2) + HUMAN_VARI)
+        time.sleep((ROTATE_DELAY * 1.2))
         keyboard.release(rotate_180_key)
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
-        time.sleep(ROTATE_DELAY + HUMAN_VARI)
+        time.sleep(ROTATE_DELAY)
         keyboard.release(rotate_counterclockwise_key)
 
     # Mini pause avant déplacement
-    time.sleep(random.uniform(0.002, 0.005))
+    # time.sleep(random.uniform(0.002, 0.005))
 
     # Déplacement horizontal
     x_target = best_position[1]
@@ -390,17 +390,17 @@ def key_press(best_position, best_rotation):
     if delta < 0:
         for _ in range(abs(delta)):
             keyboard.press(move_left_key)
-            time.sleep(MOVE_DELAY + HUMAN_VARI)
+            time.sleep(MOVE_DELAY)
             keyboard.release(move_left_key)
     elif delta > 0:
         for _ in range(delta):
             keyboard.press(move_right_key)
-            time.sleep(MOVE_DELAY + HUMAN_VARI)
+            time.sleep(MOVE_DELAY)
             keyboard.release(move_right_key)
 
     # Hard drop
     keyboard.press('space')
-    time.sleep(DROP_DELAY + HUMAN_VARI)
+    time.sleep(DROP_DELAY)
     keyboard.release('space')
 
 
