@@ -4,27 +4,18 @@ import numpy as np
 import math
 from PIL import ImageGrab
 from TetrisBoard import TetrisBoard
-import pyautogui
+import pyautogui # somehow the mouse get_position doesn't work
 
-# Board coordinates
-x1_board, y1_board = 478, 250  # top left
-x2_board, y2_board = 802, 890  # bottom right
+x1_board, y1_board = 825,252 # top left of board
+x2_board, y2_board = 1147,894 # bottom right of board
+x1, y1 = 1251,328
+x2, y2 = 0, 0
+x3, y3 = 0, 0
+x4, y4 = 0, 0
+x5, y5 = 1256,726
 
-# Piece coordinates
-x1, y1 = 884, 338  # first piece
-x5, y5 = 892, 731  # fifth piece
 
-# Calculated intermediate piece positions
-x2, y2 = (x1 + x5)//2, y1 + math.floor((y5 - y1)/4*1)
-x3, y3 = (x1 + x5)//2, y1 + math.floor((y5 - y1)/4*2)
-x4, y4 = (x1 + x5)//2, y1 + math.floor((y5 - y1)/4*3)
-
-# Pixel area pour la détection des couleurs
-pixel_area = (y5 - y1)//10
-
-# Plus besoin de refaire la calibration 1,2,3,4
-board_initialized = True
-
+pixel_area = 30 # number of pixels to check for color - auto
 
 # keybinds
 rotate_clockwise_key = 'x' # for some reason this is the only key that works - 'up' doesn't work
@@ -34,8 +25,8 @@ move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 7 # number of best moves to keep at each depth - higher number means more accurate but slower
-max_depth = 7 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
+calculation_accuracy = 6 # number of best moves to keep at each depth - higher number means more accurate but slower
+max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
 wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
 scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
 jstris = False # jstris mode - changes colors
@@ -122,97 +113,125 @@ tetris_pieces = {
 }
 
 
-def evaluate_board(board):
-    # Hauteur max et bloc le plus haut
-    highest_block_row = 20
-    for row in range(board.shape[0]):
-        if not np.any(board[row] == 1):
-            highest_block_row = row
-            break
+def human_delay():
+    time.sleep(random.uniform(0.002, 0.006))
 
-    # Somme des hauteurs par colonne
-    sum_of_heights = 0
-    heights = []
+def evaluate_board(board):
+    """
+    Évalue un plateau Tetris et retourne un score.
+    Plus le score est élevé, meilleur est le placement.
+    """
+    # Hauteur de chaque colonne
+    heights = np.zeros(board.shape[1], dtype=int)
     for col in range(board.shape[1]):
-        col_height = 0
-        for row in reversed(range(board.shape[0])):
-            if board[row][col] == 1:
-                col_height = row + 1
-                break
-        sum_of_heights += col_height
-        heights.append(col_height)
+        column = board[:, col]
+        if np.any(column == 1):
+            heights[col] = board.shape[0] - np.argmax(np.flipud(column))
+    
+    max_height = np.max(heights)  # hauteur maximale
+    total_height = np.sum(heights)  # somme des hauteurs
 
     # Lignes complétées
-    num_cleared_rows = np.sum(np.all(board == 1, axis=1))
-
-    # Trous et blocages
-    holes = np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
-    blockades = np.sum((board == 1) & (np.cumsum(board, axis=0) > 0))
-
-    # Différence de hauteur entre colonnes pour lisser le plateau
-    height_diff = max(heights) - min(heights)
-
-    # Weighted heights (légèrement plus lourd pour les blocs très hauts)
-    weighted_heights = 0
+    cleared_rows = np.sum(np.all(board == 1, axis=1))
+    
+    # Trous (0 sous un bloc)
+    holes = 0
     for col in range(board.shape[1]):
-        for row in reversed(range(board.shape[0])):
-            if board[row][col] == 1:
-                if row > 5:
-                    weighted_heights += (row + 1) * (row + 1 - 5)
-                else:
-                    weighted_heights += (row + 1)
-                break
+        column = board[:, col]
+        first_block = np.argmax(column)
+        holes += np.sum(column[first_block:] == 0)
 
-    # Nouvelle formule de score
-    A, B, C, D, E, F = -1, 12, -55, -1, -1, -3
-    score = (A * weighted_heights +
-             B * num_cleared_rows**3 +
-             C * holes +
-             D * blockades +
-             E * highest_block_row +
-             F * height_diff)
+    # Bumpiness (irrégularité du plateau)
+    bumpiness = np.sum(np.abs(np.diff(heights)))
+
+    # Blocades : blocs avec des trous au-dessus (comme ton D)
+    blockades = 0
+    for col in range(board.shape[1]):
+        column = board[:, col]
+        first_block = np.argmax(column)
+        blockades += np.sum(column[first_block:] == 1) - np.sum(column[first_block:] == 1 & (column[first_block:] == 0))
+
+    # Score pondéré inspiré des AI Tetris classiques
+    # Poids : max_height, lignes, trous, bumpiness, blockades
+    score = (
+        -0.510066 * max_height + 
+        0.760666 * cleared_rows - 
+        0.35663 * holes - 
+        0.184483 * bumpiness - 
+        0.1 * blockades
+    )
+    
     return score
 
 
 def get_positions(board, rotated_block):
-    # Return a list of all possible positions for the given block and rotation
+    """
+    Retourne toutes les positions possibles pour un bloc donné sur le plateau.
+    """
     possible_positions = []
-    # remove padded 0s from rotated block
-    rotated_block = rotated_block[~np.all(rotated_block == 0, axis=1)]
-    rotated_block = rotated_block[:, ~np.all(rotated_block == 0, axis=0)]
-    # drop block from top for each column - bottom is index 0
-    for x in range(board.shape[1] - rotated_block.shape[1] + 1):
-        y = board.shape[0] - rotated_block.shape[0] - 1
-        while y >= 0:
-            if np.any(np.logical_and(rotated_block, board[y:y + rotated_block.shape[0], x:x + rotated_block.shape[1]])):
-                if y > board.shape[0] - rotated_block.shape[0]:
-                    print("You lose!")
-                    break
-                    # exit()
-                possible_positions.append((y + 1, x))
+
+    # Supprime les zéros padding
+    block = rotated_block[~np.all(rotated_block == 0, axis=1)]
+    block = block[:, ~np.all(block == 0, axis=0)]
+    block_height, block_width = block.shape
+    board_height, board_width = board.shape
+
+    for x in range(board_width - block_width + 1):
+        # Commence en haut
+        y = 0
+        while y <= board_height - block_height:
+            # Vérifie collision
+            if np.any(np.logical_and(block, board[y:y + block_height, x:x + block_width])):
                 break
-            if y == 0:
-                possible_positions.append((y, x))
-            y -= 1
+            y += 1
+        # On a dépassé la ligne sans collision → placer juste avant
+        final_y = y - 1
+        if final_y < 0:
+            # Impossible de placer → fin du jeu
+            continue
+        possible_positions.append((final_y, x))
 
     return possible_positions
 
+
 def clear_full_rows(board):
-    while True:
-        for y, row in enumerate(board):
-            if all(cell == 1 for cell in row):
-                board = np.delete(board, y, axis=0)
-                # insert new row at last index which is the top of the board
-                board = np.insert(board, board.shape[0], 0, axis=0)
-                break
-            if y == board.shape[0] - 1:
-                return board
+    """
+    Supprime toutes les lignes complètes et ajoute des lignes vides en haut.
+    """
+    full_rows = np.all(board == 1, axis=1)
+    num_cleared = np.sum(full_rows)
+    
+    if num_cleared == 0:
+        return board
+    
+    # Garde seulement les lignes non complètes
+    new_board = board[~full_rows]
+    
+    # Ajoute des lignes vides en haut
+    empty_rows = np.zeros((num_cleared, board.shape[1]), dtype=int)
+    new_board = np.vstack((empty_rows, new_board))
+    
+    return new_board
+
             
 def num_of_full_rows(board):
+    """Retourne le nombre de lignes complètes sur le plateau."""
     return np.sum(np.all(board == 1, axis=1))
 
+
 def find_least_holes(board):
-    return np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
+    """
+    Compte le nombre de trous : 0 sous un bloc dans une colonne.
+    """
+    holes = 0
+    for col in range(board.shape[1]):
+        column = board[:, col]
+        # trouve le premier bloc
+        first_block_idx = np.argmax(column)
+        # tous les zéros sous ce bloc sont des trous
+        holes += np.sum(column[first_block_idx:] == 0)
+    return holes
+
 
 
 
@@ -348,44 +367,41 @@ board_initialized = False
 piece_array = []
 
 def key_press(best_position, best_rotation):
-    import random
-    
-    
-    # Petit délai humain entre actions
-    def human_delay():
-        time.sleep(random.uniform(0.015, 0.065))
-
-    # Rotation
+    # rotate
+    print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
-        keyboard.press_and_release(rotate_clockwise_key)
-        human_delay()
+        keyboard.press(rotate_clockwise_key)
+        keyboard.release(rotate_clockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 2:
-        keyboard.press_and_release(rotate_180_key)
-        human_delay()
+        keyboard.press(rotate_180_key)
+        keyboard.release(rotate_180_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
     elif best_rotation == 3:
-        keyboard.press_and_release(rotate_counterclockwise_key)
-        human_delay()
-
-    # Déplacement horizontal
-    current_x = 3  # position de départ approximative
-    target_x = best_position[1]
-
-    if target_x < current_x:
-        for _ in range(current_x - target_x):
-            keyboard.press_and_release(move_left_key)
-            human_delay()
-    elif target_x > current_x:
-        for _ in range(target_x - current_x):
-            keyboard.press_and_release(move_right_key)
-            human_delay()
-
-    # Micro-hésitation comme un humain
-    time.sleep(random.uniform(0.03, 0.11))
-
-    # Hard drop
-    keyboard.press_and_release(drop_key)
-    human_delay()
-
+        keyboard.press(rotate_counterclockwise_key)
+        keyboard.release(rotate_counterclockwise_key)
+        if key_delay > 0:
+            time.sleep(key_delay)
+    # press left arrow or right arrow to move to position
+    if best_position[1] < 3:
+        for i in range(3 - best_position[1]):
+            keyboard.press(move_left_key)
+            keyboard.release(move_left_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
+    elif best_position[1] > 3:
+        for i in range(best_position[1] - 3):
+            keyboard.press(move_right_key)
+            keyboard.release(move_right_key)
+            if key_delay > 0:
+                time.sleep(key_delay)
+    # press space to drop piece
+    keyboard.press('space')
+    keyboard.release('space')
+    if key_delay > 0:
+        time.sleep(key_delay)
 
 
 def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_right_y):
@@ -423,22 +439,22 @@ def get_tetris_board_from_screen(top_left_x, top_left_y, bottom_right_x, bottom_
 
 # start program
 while True:
-    if keyboard.is_pressed('1'):
+    if keyboard.is_pressed('['):
         x1, y1 = pyautogui.position()
         print(f"first piece: {x1},{y1}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed('2'):
+    if keyboard.is_pressed(']'):
         x5, y5 = pyautogui.position()
         print(f"fifth piece: {x5},{y5}")
         time.sleep(0.2)
     
-    if keyboard.is_pressed('3'):
+    if keyboard.is_pressed('-'):
         x1_board, y1_board = pyautogui.position()
         print(f"top left: {x1_board},{y1_board}")
         time.sleep(0.2)
 
-    if keyboard.is_pressed('4'):
+    if keyboard.is_pressed('='):
         x2_board, y2_board = pyautogui.position()
         print(f"bottom right: {x2_board},{y2_board}")
         time.sleep(0.2)

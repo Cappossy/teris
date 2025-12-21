@@ -25,7 +25,7 @@ move_left_key = 'left'
 move_right_key = 'right'
 drop_key = 'space'
 # constants - ARR 0ms - DAS 40ms
-calculation_accuracy = 5 # number of best moves to keep at each depth - higher number means more accurate but slower
+calculation_accuracy = 6 # number of best moves to keep at each depth - higher number means more accurate but slower
 max_depth = 6 # number of moves into the future to simulate, max is 6, you can only see 6 blocks at once - higher number means more accurate but slower
 wait_time = 0.04 # time to wait, can't go too low because you need to wait for screen to refresh
 scan_board = True # some modes require scanning the board because of extra pieces - zen, multiplayer
@@ -34,7 +34,6 @@ jstris = False # jstris mode - changes colors
 # Game Settings - DAS 40ms, ARR 0ms
 
 key_delay = 0
-
 # Colors for tetrio
 colors = [
     (194, 64, 70),  # red - Z
@@ -113,41 +112,55 @@ tetris_pieces = {
 }
 
 
-def evaluate_board(board):
-    # Implement your heuristic function here
-    # The height of the tallest column - find highest row with a 1
-    highest_block_row = 20
-    for row in range(board.shape[0]):
-        if not np.any(board[row] == 1):
-            highest_block_row = row
-            break
-    # The sum of max height block in each column - the bottom of the board is index 0
-    sum_of_heights = 0
-    for col in range(board.shape[1]):
-        for row in reversed(range(board.shape[0])):
-            if board[row][col] == 1:
-                sum_of_heights += row + 1
-                break
-    num_cleared_rows = np.sum(np.all(board == 1, axis=1))
-    # The number of holes - find number of 0s with 1s above
-    holes = np.sum((board == 0) & (np.cumsum(board, axis=0) < np.sum(board, axis=0)))
-    # The number of blockades - find number of 1s with 0s above
-    blockades = np.sum((board == 1) & (np.cumsum(board, axis=0) > 0))
-    # assign higher weights to higher blocks
-    weighted_heights = 0
-    for col in range(board.shape[1]):
-        for row in reversed(range(board.shape[0])):
-            # find highest block in each column
-            if board[row][col] == 1:
-                if row > 5:
-                    weighted_heights += (row + 1) * (row + 1 - 5)
-                else:
-                    weighted_heights += (row + 1)
-                break
+def human_delay():
+    time.sleep(random.uniform(0.002, 0.006))
 
-    A, B, C, D, E = -1, 10, -50, -1, -1
-    score = A * weighted_heights + B * num_cleared_rows * num_cleared_rows * num_cleared_rows + C * holes + D * blockades + E * highest_block_row
+def evaluate_board(board):
+    heights = []
+    holes = 0
+    bumpiness = 0
+
+    for col in range(10):
+        col_height = 0
+        block_seen = False
+        for row in reversed(range(20)):
+            if board[row][col]:
+                col_height = row + 1
+                block_seen = True
+            elif block_seen:
+                holes += 1
+        heights.append(col_height)
+
+    max_height = max(heights)
+
+    # 🚨 ZONE ROUGE (au-dessus de 12)
+    danger_penalty = 0
+    if max_height > 12:
+        danger_penalty = (max_height - 12) ** 3 * 10
+
+    # 🧱 TOUR (colonne dominante)
+    tallest = max(heights)
+    avg = sum(heights) / 10
+    tower_penalty = (tallest - avg) ** 2 * 4
+
+    # 🌊 SURFACE IRRÉGULIÈRE
+    for i in range(9):
+        bumpiness += abs(heights[i] - heights[i+1])
+
+    cleared = np.sum(np.all(board == 1, axis=1))
+
+    score = (
+        -6.0 * max_height
+        -8.0 * holes
+        -3.0 * bumpiness
+        -tower_penalty
+        -danger_penalty
+        +10.0 * cleared * cleared
+    )
+
     return score
+
+
 
 def get_positions(board, rotated_block):
     # Return a list of all possible positions for the given block and rotation
@@ -191,6 +204,7 @@ def find_least_holes(board):
 
 
 
+
 def find_best_position(board, block_array, depth):
     def helper(boards, block, position_rotations_array, num_boards_keep):
         return_position_rotations_array = None
@@ -202,6 +216,29 @@ def find_best_position(board, block_array, depth):
                 positions = get_positions(board, block[rotation])
                 for position in positions:
                     new_board = place_block(board, block[rotation], position)
+
+                    # ===== RÈGLES DE SURVIE (HARD FILTER) =====
+                    heights = []
+                    for col in range(10):
+                        h = 0
+                        for row in reversed(range(20)):
+                            if new_board[row][col]:
+                                h = row + 1
+                                break
+                        heights.append(h)
+
+                    max_h = max(heights)
+                    avg_h = sum(heights) / 10
+
+                    # 🚫 INTERDIT : suicide
+                    if max_h >= 16:
+                        continue
+
+                    # 🚫 INTERDIT : tour dominante
+                    if max_h - avg_h >= 5:
+                        continue
+                    # ========================================
+
                     # return position if tetris or full clear
                     if num_of_full_rows(new_board) == 4 or np.all(new_board == 0):
                         if position_rotations_array is None:
@@ -209,11 +246,16 @@ def find_best_position(board, block_array, depth):
                         else:
                             return_position_rotations_array = position_rotations_array[index]
 
-                    # evaluate board score and add to list
                     score = evaluate_board(new_board)
+
+                    # 🆘 panic mode
+                    if max_h >= 13:
+                        score -= max_h * 25
+
                     score_array.append(score)
-                    new_board = clear_full_rows(new_board) # clear after evaluation
+                    new_board = clear_full_rows(new_board)
                     new_boards.append(new_board)
+
                     if position_rotations_array is None:
                         new_position_rotation_array.append([position, rotation])
                     else:
@@ -261,33 +303,28 @@ def euclidean_distance(color1, color2):
 def closest_color_in_area(colors, x, y):
     min_diff = float('inf')
     closest_color = (0, 0, 0)
-    while min_diff > 20:
-        # break if esc
+
+    for _ in range(5):  # max 5 essais
         if keyboard.is_pressed('esc'):
             break
-        # get pixel colors in a 10 by 10 around x and y
-        target_colors = []
-        # Grab a portion of the screen
-        half = pixel_area//2
-        full = half * 2
-        image = ImageGrab.grab(bbox=(x - half, y - half, x + half, y + half))
-        # Loop through the pixels in the grabbed image
-        for i in range(full):
-            for j in range(full):
-                target_colors.append(image.getpixel((i, j)))
 
-        # find the closest color in target_colors that is in colors
-        closest_color = (0, 0, 0)
-        min_diff = float('inf')
-        for target_color in target_colors:
-            for color in colors:
-                diff = euclidean_distance(color, target_color)
-                if diff < min_diff:
-                    min_diff = diff
-                    closest_color = color
-                if min_diff < 20:
-                    break
-    return tuple(closest_color)
+        half = pixel_area // 2
+        image = ImageGrab.grab(bbox=(x - half, y - half, x + half, y + half))
+
+        for i in range(image.width):
+            for j in range(image.height):
+                target_color = image.getpixel((i, j))
+                for color in colors:
+                    diff = euclidean_distance(color, target_color)
+                    if diff < min_diff:
+                        min_diff = diff
+                        closest_color = color
+
+        if min_diff < 35:  # seuil PLUS LARGE
+            break
+
+    return closest_color
+
 
 def get_piece_based_on_color(matched_color, colors):
     piece = None
@@ -313,7 +350,7 @@ def get_piece_based_on_color(matched_color, colors):
         # print('Purple - T')
         piece = tetris_pieces['T']
     if piece is None:
-        print('No piece found')
+        return tetris_pieces['T']  # fallback safe
     return piece
 
 
@@ -323,20 +360,31 @@ board_initialized = False
 piece_array = []
 
 def key_press(best_position, best_rotation):
+    import random, time
+
+    # Timings pour 65‑75 APM, reste crédible humainement
+    ROTATE_DELAY = random.uniform(0.020, 0.030)
+    MOVE_DELAY   = random.uniform(0.015, 0.025)
+    DROP_DELAY   = random.uniform(0.010, 0.018)
+   #HUMAN_VARI   = random.uniform(0.002, 0.007)
+
     # rotate
     print("best rotation: " + str(best_rotation))
     if best_rotation == 1:
         keyboard.press(rotate_clockwise_key)
+        time.sleep(ROTATE_DELAY)
         keyboard.release(rotate_clockwise_key)
         if key_delay > 0:
             time.sleep(key_delay)
     elif best_rotation == 2:
         keyboard.press(rotate_180_key)
+        time.sleep(ROTATE_DELAY)
         keyboard.release(rotate_180_key)
         if key_delay > 0:
             time.sleep(key_delay)
     elif best_rotation == 3:
         keyboard.press(rotate_counterclockwise_key)
+        time.sleep(ROTATE_DELAY)
         keyboard.release(rotate_counterclockwise_key)
         if key_delay > 0:
             time.sleep(key_delay)
@@ -344,17 +392,20 @@ def key_press(best_position, best_rotation):
     if best_position[1] < 3:
         for i in range(3 - best_position[1]):
             keyboard.press(move_left_key)
+            time.sleep(MOVE_DELAY)
             keyboard.release(move_left_key)
             if key_delay > 0:
                 time.sleep(key_delay)
     elif best_position[1] > 3:
         for i in range(best_position[1] - 3):
             keyboard.press(move_right_key)
+            time.sleep(MOVE_DELAY)
             keyboard.release(move_right_key)
             if key_delay > 0:
                 time.sleep(key_delay)
     # press space to drop piece
     keyboard.press('space')
+    time.sleep(DROP_DELAY)
     keyboard.release('space')
     if key_delay > 0:
         time.sleep(key_delay)
@@ -422,9 +473,14 @@ while True:
     if x1 != 0 and x5 != 0 and not board_initialized and keyboard.is_pressed('space'):
         print('Board initialized')
         board_initialized = True
+
+        # 🔒 ANTI-SPAM DÉBUT DE GAME (IMPORTANT)
+        time.sleep(0.6)
+        move_count = 0
+
         # calculate pixel_area
         pixel_area = (y5 - y1)//10
-        print("pixel_area: ", pixel_area)
+
         x2, y2 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*1)
         x3, y3 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*2)
         x4, y4 = (x1+x5)//2, y1+math.floor(((y5-y1)/4)*3)
@@ -454,12 +510,21 @@ while True:
                 break
             # lock until piece changes
             if first_move:
-                closest_color1_0 = closest_color_in_area(colors, x1, y1)
-                closest_color2_0 = closest_color_in_area(colors, x2, y2)
-                if closest_color2 != closest_color2_0 or closest_color1 != closest_color1_0:
-                    first_move = False
-                else:
-                    continue
+                wait_start = time.time()
+                detected = False
+
+                while time.time() - wait_start < 0.5:
+                    c1 = closest_color_in_area(colors, x1, y1)
+                    c2 = closest_color_in_area(colors, x2, y2)
+
+                    if c1 != closest_color1 or c2 != closest_color2:
+                        detected = True
+                        break
+
+                    time.sleep(0.005)
+
+                first_move = False
+
             # total time
             start_time = time.time()
             # time to get color
